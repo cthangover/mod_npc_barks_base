@@ -1,0 +1,9 @@
+scene: npc_barks_tools
+channel: ambient
+actor.c: npc_barks_tools/c
+condition: tools_enabled == 1
+cooldown: 100
+---
+:start
+text "Второй продолжает разговор" key=npc_barks/tools/beta who=c duration=40
+end

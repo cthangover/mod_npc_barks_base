@@ -1,0 +1,34 @@
+{
+  "id": "npc_barks_base",
+  "name": "NPC Ambient Scenarios",
+  "version": "0.1.0",
+  "author": "ct",
+  "description": "Concurrent ambient scenario hosts, speech cues and NPC attention. Prototype.",
+  "category": "engine, library",
+  "sources": [
+    "src/**/*.cs"
+  ],
+  "test_sources": [
+    "tests/*.cs"
+  ],
+  "depends": [
+    "rpg>=1",
+    "dialog_base>=1",
+    "ui_base>=1",
+    "tile_render_base>=1"
+  ],
+  "test_suites": [
+    {
+      "id": "prototype",
+      "activate": [
+        "--itest=npc_barks"
+      ]
+    },
+    {
+      "id": "tools",
+      "activate": [
+        "--itest=npc_barks_tools"
+      ]
+    }
+  ]
+}

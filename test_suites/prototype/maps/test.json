@@ -1,0 +1,37 @@
+{
+  "Kind": "rpg_map",
+  "Items": [
+    {
+      "Id": "npc_barks_test",
+      "Name": "npc_barks/test/map",
+      "Width": 14,
+      "Height": 12,
+      "TileSize": 128,
+      "PatchSize": 512,
+      "Zoom": 0.5,
+      "Spawn": {
+        "X": 2,
+        "Y": 4,
+        "Dir": "Right"
+      },
+      "LightMode": "day",
+      "Legend": {
+        "p": "junior_reaper_paper_grief/jrp_world/ground_paving"
+      },
+      "Ground": [
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp",
+        "pppppppppppppp"
+      ]
+    }
+  ]
+}

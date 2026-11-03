@@ -1,0 +1,14 @@
+scene: npc_barks_test
+channel: ambient
+actor.b: npc_barks_test/b
+on: speech.finished
+cue: test_question
+source_actor: npc_barks_test/a
+condition: can_hear("b", "source")
+cooldown: 50
+---
+:reply
+action npc.look who=b target=source
+flag bark_test_replied 1
+text "Ответ второго НПС" who=b cue=test_answer key=npc_barks/test/reply duration=1
+end

@@ -1,0 +1,22 @@
+{
+  "Actions": [
+    {
+      "Id": "npc.look",
+      "Name": "npc_barks/schema/look",
+      "Description": "npc_barks/schema/look_desc",
+      "Category": "world",
+      "Params": [
+        {
+          "Key": "who",
+          "Type": "text",
+          "Required": true
+        },
+        {
+          "Key": "target",
+          "Type": "text",
+          "Required": true
+        }
+      ]
+    }
+  ]
+}

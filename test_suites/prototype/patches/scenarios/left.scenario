@@ -1,0 +1,6 @@
+patch_of: npc_barks/initiator
+replace: left
+---
+flag bark_test_left 1
+flag bark_test_patch 1
+text "Ушёл куда-то…" who=a key=npc_barks/test/left duration=1

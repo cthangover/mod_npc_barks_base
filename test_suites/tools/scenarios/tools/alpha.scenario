@@ -1,0 +1,18 @@
+scene: npc_barks_tools
+channel: ambient
+actor.a: npc_barks_tools/a
+condition: tools_enabled == 1
+cooldown: 100
+---
+:start
+set marker alpha
+:text
+text "Первый: исходный текст" key=npc_barks/tools/alpha who=a cue=tools_question duration=20
+delay 0.1
+:effect
+flag tools_effect 1
+when "tools_gate == 1" wait=true timeout=10 else=timeout -> :done
+:timeout
+flag tools_timeout 1
+:done
+end

@@ -1,0 +1,31 @@
+{
+  "Kind": "rpg_placement",
+  "Items": [
+    {
+      "Id": "npc_barks_test/a",
+      "Object": "junior_reaper_paper_grief/jrp_world/colleague",
+      "X": 4,
+      "Y": 4,
+      "Interact": {
+        "Commands": [
+          "ptext \"Обычный диалог\" key=npc_barks/test/modal",
+          "end"
+        ]
+      }
+    },
+    {
+      "Id": "npc_barks_test/b",
+      "Object": "junior_reaper_paper_grief/jrp_world/colleague",
+      "X": 4,
+      "Y": 5,
+      "Interact": null
+    },
+    {
+      "Id": "npc_barks_test/c",
+      "Object": "junior_reaper_paper_grief/jrp_world/colleague",
+      "X": 6,
+      "Y": 4,
+      "Interact": null
+    }
+  ]
+}

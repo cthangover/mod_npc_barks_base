@@ -1,0 +1,11 @@
+scene: npc_barks_tools
+channel: ambient
+actor.b: npc_barks_tools/b
+on: speech.finished
+cue: tools_question
+source_actor: npc_barks_tools/a
+condition: can_hear("b", "source")
+cooldown: 100
+---
+text "Я услышал реплику" key=npc_barks/tools/reply who=b duration=20
+end

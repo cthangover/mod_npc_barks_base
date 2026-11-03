@@ -1,0 +1,10 @@
+scene: npc_barks_test
+channel: ambient
+actor.c: npc_barks_test/c
+condition: bark_test_enabled == 1
+cooldown: 50
+---
+:start
+text "Независимый разговор" who=c key=npc_barks/test/independent duration=3
+flag bark_test_independent 1
+end

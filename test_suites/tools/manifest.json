@@ -1,0 +1,11 @@
+{
+  "name": "Background authoring tools verification",
+  "sources": [
+    "src/*.cs"
+  ],
+  "depends": [
+    "junior_reaper_paper_grief>=0.2",
+    "scenario_editor>=1",
+    "scenario_studio>=0.1"
+  ]
+}

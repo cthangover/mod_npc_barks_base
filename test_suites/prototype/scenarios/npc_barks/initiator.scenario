@@ -1,0 +1,18 @@
+scene: npc_barks_test
+channel: ambient
+actor.a: npc_barks_test/a
+condition: near("a", "player", 4) && bark_test_enabled == 1
+cooldown: 50
+---
+:start
+action npc.look who=a target=player
+text "Вопрос от первого НПС" who=a cue=test_question key=npc_barks/test/question duration=1
+when "!near(\"a\", \"player\", 5)" wait=true timeout=8 else=stay -> :left
+:stay
+flag bark_test_stayed 1
+goto -> :done
+:left
+flag bark_test_left 1
+text "Ушёл куда-то…" who=a key=npc_barks/test/left duration=1
+:done
+end
