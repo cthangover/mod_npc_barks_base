@@ -107,7 +107,7 @@ namespace Cthangover.Mods.NpcBarks.Prototype
                     Check(!host.Session.Find("npc_barks_test/a").RouteHeld, "interaction interrupts ambient ownership");
                     Press(Key.E, false);
                     RpgInput.FindDialogBox()?.Abort();
-                    Manager().SwitchScene("jrp_market"); Next(); return;
+                    Manager().SwitchScene("npc_barks_exit"); Next(); return;
                 case 11:
                     if (wait < 0.5 || GodotSceneService.IsTransitioning) return;
                     Check(BarkDirector.Current.Runs.Count == 0, "scene exit drops old runs and events");
@@ -154,8 +154,7 @@ namespace Cthangover.Mods.NpcBarks.Prototype
         {
             if (string.IsNullOrEmpty(shots) || DisplayServer.GetName() == "headless") return;
             System.IO.Directory.CreateDirectory(shots);
-            using var image = GetViewport().GetTexture().GetImage();
-            image.SavePng(System.IO.Path.Combine(shots, name + ".png"));
+            Cthangover.Mods.Interface.View.ViewportCapture.SavePng(GetViewport(), System.IO.Path.Combine(shots, name + ".png"));
         }
         private void Finish()
         {

@@ -19,6 +19,8 @@ namespace Cthangover.Mods.NpcBarks
         public string On { get; private set; }
         public string Cue { get; private set; }
         public string SourceActor { get; private set; }
+        /// <summary>Optional fair rotation shared by alternative scenarios for the same participants.</summary>
+        public string Variation { get; private set; }
         public double Cooldown { get; private set; }
         public bool Once { get; private set; }
         public int Priority { get; private set; }
@@ -36,6 +38,7 @@ namespace Cthangover.Mods.NpcBarks
             meta.TryGetValue("on", out var on); result.On = on;
             meta.TryGetValue("cue", out var cue); result.Cue = cue;
             meta.TryGetValue("source_actor", out var actor); result.SourceActor = actor;
+            meta.TryGetValue("variation", out var variation); result.Variation = variation;
             if (meta.TryGetValue("cooldown", out var cooldown)) result.Cooldown = Number(cooldown);
             if (meta.TryGetValue("once", out var once)) result.Once = bool.Parse(once);
             if (meta.TryGetValue("priority", out var priority)) result.Priority = int.Parse(priority, CultureInfo.InvariantCulture);

@@ -100,6 +100,7 @@ namespace Cthangover.Mods.NpcBarks
             Clock += delta;
             var keys = new List<string>(BarkMemory.Data.Cooldowns.Keys);
             foreach (var key in keys) BarkMemory.Data.Cooldowns[key] = Math.Max(0, BarkMemory.Data.Cooldowns[key] - delta);
+            foreach (var state in BarkMemory.Data.Variations.Values) state.Cooldown = Math.Max(0, state.Cooldown - delta);
             // Only events queued before this update may start runs. Events emitted below wait for the next update.
             var count = events.Count;
             while (count-- > 0)
@@ -120,40 +121,42 @@ namespace Cthangover.Mods.NpcBarks
             if (scan > 0) return;
             scan = 0.1;
             if (byMap.TryGetValue(session.Map.ID, out var nearby))
-                foreach (var definition in nearby) TryStart(definition, null);
+                ScanNearby(nearby);
             glance += 0.1;
             PassiveAttention();
         }
 
-        private void TryStart(BarkDefinition definition, BarkSpeechEvent speech)
+        private bool TryStart(BarkDefinition definition, BarkSpeechEvent speech)
         {
-            if (suppressed.Contains(definition.Id) || definition.Map != session.Map.ID || runs.Count >= 32) return;
-            if (definition.Once && BarkMemory.Data.Completed.Contains(definition.Id)) return;
-            if (BarkMemory.Data.Cooldowns.TryGetValue(definition.Id, out var cooldown) && cooldown > 0) return;
+            if (suppressed.Contains(definition.Id) || definition.Map != session.Map.ID || runs.Count >= 32) return false;
+            if (definition.Once && BarkMemory.Data.Completed.Contains(definition.Id)) return false;
+            if (BarkMemory.Data.Cooldowns.TryGetValue(definition.Id, out var cooldown) && cooldown > 0) return false;
             foreach (var run in runs)
             {
-                if (!run.Done && run.Definition.Id == definition.Id) return;
+                if (!run.Done && run.Definition.Id == definition.Id) return false;
                 if (run.Done) continue;
                 foreach (var actor in definition.Actors.Values)
-                    if (run.Definition.Actors.ContainsValue(actor)) return;
+                    if (run.Definition.Actors.ContainsValue(actor)) return false;
             }
             foreach (var actor in definition.Actors.Values)
-                if (session.Find(actor)?.Visible != true || session.Find(actor).Actor.IsMoving) return;
+                if (session.Find(actor)?.Visible != true || session.Find(actor).Actor.IsMoving) return false;
             var context = new BarkWorldContext(session, definition, speech);
             try
             {
-                if (!ScenarioCondition.EvaluateWithServices(definition.Condition, context.Scope, context)) return;
+                if (!ScenarioCondition.EvaluateWithServices(definition.Condition, context.Scope, context)) return false;
                 var candidate = new BarkRun(this, definition, context, speech);
                 foreach (var actor in definition.Actors.Values) session.Find(actor).RouteHeld = true;
                 runs.Add(candidate);
                 try { candidate.Start(); }
                 catch { candidate.Abort(); throw; }
                 GameLogger.Log("NPC_BARKS", "started " + definition.Id + " run=" + candidate.RunId);
+                return true;
             }
             catch (Exception ex)
             {
                 BarkMemory.Data.Cooldowns[definition.Id] = 30;
                 GameLogger.Log("NPC_BARKS", definition.Id + ": " + ex.Message, LogLevel.Error);
+                return false;
             }
         }
 

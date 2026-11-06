@@ -132,6 +132,7 @@ namespace Cthangover.Mods.NpcBarks
             }
             if (!aborted) BarkMemory.Data.Completed.Add(Definition.Id);
             BarkMemory.Data.Cooldowns[Definition.Id] = aborted ? 2 : Definition.Cooldown;
+            director.PauseVariation(Definition, aborted ? 2 : Definition.Cooldown);
             GameLogger.Log("NPC_BARKS", Definition.Id + " run=" + RunId + (aborted ? " interrupted" : " completed"));
         }
 

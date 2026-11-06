@@ -6,5 +6,7 @@ namespace Cthangover.Mods.NpcBarks
     {
         public HashSet<string> Completed { get; set; } = new();
         public Dictionary<string, double> Cooldowns { get; set; } = new();
+        /// <summary>Unplayed alternatives and group pauses survive map changes and saved-game loads.</summary>
+        public Dictionary<string, BarkVariationState> Variations { get; set; } = new();
     }
 }

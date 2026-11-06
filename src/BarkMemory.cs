@@ -26,6 +26,7 @@ namespace Cthangover.Mods.NpcBarks
             if (slot?.Data != null && slot.Data.TryGetValue("History", out var blob))
                 Data = blob.ReadJson<BarkMemoryData>() ?? new();
             Data.Completed ??= new(); Data.Cooldowns ??= new();
+            Data.Variations ??= new();
             return true;
         }
     }
