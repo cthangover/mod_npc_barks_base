@@ -4,7 +4,7 @@
     "src/*.cs"
   ],
   "depends": [
-    "junior_reaper_paper_grief>=0.2",
+    "junior_reaper_paper_grief>=0.1.0",
     "scenario_editor>=1",
     "scenario_studio>=0.1"
   ]
