@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "author": "ct",
   "description": "Concurrent ambient scenario hosts, speech cues and NPC attention. Prototype.",
-  "category": "engine, library",
+  "categories": ["engine", "library"],
   "sources": [
     "src/**/*.cs"
   ],
