@@ -31,7 +31,7 @@ namespace Cthangover.Mods.NpcBarks
             set
             {
                 worldPaused = value;
-                if (RpgWorldHost.Current != null) RpgWorldHost.Current.SimulationPaused = value;
+                session?.SetPaused(value);
             }
         }
 
@@ -93,10 +93,9 @@ namespace Cthangover.Mods.NpcBarks
             var result = new StringBuilder();
             foreach (var role in context.Roles)
             {
-                var actor = context.Session.Find(role.Value);
-                result.Append(role.Key).Append(" = ").Append(role.Value).Append("; visible=").Append(actor?.Visible == true);
-                if (context.TryPosition(role.Key, out var position))
-                    result.Append("; distance(player)=").Append(position.DistanceTo(context.Session.Player.Position).ToString("F2", CultureInfo.InvariantCulture));
+                result.Append(role.Key).Append(" = ").Append(role.Value).Append("; visible=").Append(context.Space.TryPosition(role.Value, out _));
+                if (context.TrySpatialPosition(role.Key, out var position))
+                    result.Append("; distance(player)=").Append(position.DistanceTo(context.Space.TryPosition("player", out var player) ? player : position).ToString("F2", CultureInfo.InvariantCulture));
                 result.AppendLine();
             }
             if (!string.IsNullOrWhiteSpace(condition))
@@ -113,16 +112,15 @@ namespace Cthangover.Mods.NpcBarks
         {
             foreach (var run in runs) if (!run.Done && run.Definition.Id == definition.Id) return "running";
             if (session == null) return "no_world";
-            if (definition.Map != session.Map.ID) return "wrong_map";
+            if (definition.Map != session.MapId) return "wrong_map";
             if (suppressed.Contains(definition.Id)) return "stopped";
             if (definition.Once && BarkMemory.Data.Completed.Contains(definition.Id)) return "once";
             if (BarkMemory.Data.Cooldowns.TryGetValue(definition.Id, out var cooldown) && cooldown > 0) return "cooldown";
             foreach (var actor in definition.Actors.Values)
             {
-                var instance = session.Find(actor);
-                if (instance?.Visible != true) return "actor_missing";
-                if (instance.Actor.IsMoving) return "moving";
-                if (instance.RouteHeld) return "busy";
+                if (!session.TryPosition(actor, out _)) return "actor_missing";
+                if (session.Moving(actor)) return "moving";
+                if (session.Held(actor)) return "busy";
             }
             if (definition.On != null) return "trigger";
             return ScenarioCondition.EvaluateWithServices(definition.Condition, context.Scope, context) ? "ready" : "condition_false";
@@ -210,13 +208,13 @@ namespace Cthangover.Mods.NpcBarks
         {
             try
             {
-                if (RpgWorldHost.Current == null) throw new InvalidOperationException("Open a running game first");
+                if (session == null) throw new InvalidOperationException("Open a running game first");
                 var id = path.StartsWith("scenarios/", StringComparison.Ordinal) ? path.Substring(10, path.Length - 19) : path;
                 var definition = BuildDefinition(id, modId, path, text, modId, path, text)
                     ?? throw new InvalidOperationException("This is not an ambient scenario");
                 if (definition.On != null && definition.SourceActor == null)
                     throw new InvalidOperationException("Preview of an event scenario needs source_actor");
-                if (RpgWorldHost.Current.Session?.Map.ID != definition.Map)
+                if (session.MapId != definition.Map)
                     GetTree().Root.GetNode<SceneManager>("SceneManager").SwitchScene(definition.Map);
                 pendingPreview = definition; pendingCompany = company;
                 error = null; return true;
@@ -225,7 +223,7 @@ namespace Cthangover.Mods.NpcBarks
         }
         private void StartPendingPreview()
         {
-            if (pendingPreview == null || pendingPreview.Map != session.Map.ID) return;
+            if (pendingPreview == null || pendingPreview.Map != session.MapId) return;
             var definition = pendingPreview; var company = pendingCompany; pendingPreview = null;
             foreach (var run in runs.ToArray())
                 foreach (var actor in definition.Actors.Values)
@@ -233,7 +231,7 @@ namespace Cthangover.Mods.NpcBarks
             try
             {
                 ForceStart(definition, SourceFor(definition), false);
-                if (company && byMap.TryGetValue(session.Map.ID, out var neighbors))
+                if (company && byMap.TryGetValue(session.MapId, out var neighbors))
                     foreach (var other in neighbors) if (other.Id != definition.Id) TryStart(other, null);
             }
             catch (Exception ex) { Trace(null, "preview rejected: " + ex.Message); }
@@ -243,14 +241,14 @@ namespace Cthangover.Mods.NpcBarks
         private void ForceStart(BarkDefinition definition, BarkSpeechEvent source, bool hold)
         {
             foreach (var id in definition.Actors.Values)
-                if (session.Find(id)?.Visible != true || session.Find(id).Actor.IsMoving)
+                if (!session.TryPosition(id, out _) || session.Moving(id) || !session.CanReserve(id))
                     throw new InvalidOperationException("Participant is unavailable: " + id);
             foreach (var id in definition.Actors.Values)
                 foreach (var active in runs)
                     if (!active.Done && active.Definition.Actors.ContainsValue(id)) throw new InvalidOperationException("Participant is busy: " + id);
             suppressed.Remove(definition.Id);
             var run = new BarkRun(this, definition, new BarkWorldContext(session, definition, source), source);
-            foreach (var id in definition.Actors.Values) session.Find(id).RouteHeld = true;
+            foreach (var id in definition.Actors.Values) session.Hold(id, true);
             runs.Add(run);
             if (hold) run.PauseDebug();
             try { run.Start(); } catch { run.Abort(); throw; }

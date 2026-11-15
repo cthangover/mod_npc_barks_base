@@ -21,7 +21,7 @@ namespace Cthangover.Mods.NpcBarks
         private double remaining;
         private ActionText speech;
         private string utterance;
-        private Control bubble;
+
         public BarkDefinition Definition { get; }
         public BarkWorldContext World { get; }
         public DialogRuntime Runtime { get; } = new();
@@ -53,7 +53,7 @@ namespace Cthangover.Mods.NpcBarks
         {
             if (Done || Runtime.IsHeld || DebugPaused) return;
             foreach (var id in Definition.Actors.Values)
-                if (World.Session.Find(id)?.Visible != true) { Abort(); return; }
+                if (!World.Space.TryPosition(id, out _) || !World.Space.Owns(id)) { Abort(); return; }
             ApplyLooks();
             if (pending == null) return;
             if (!ReferenceEquals(Runtime.CurrentAction, pending)) { pending = null; return; }
@@ -95,7 +95,7 @@ namespace Cthangover.Mods.NpcBarks
             action.WaitType = WaitType.WaitEvent;
             remaining = action.Duration ?? Math.Clamp(1.2 + ResolveText(action).Length / 18.0, 2, 8);
             pending = action;
-            bubble = director.CreateBubble();
+            World.Space.Show(this);
             Emit("speech.started");
         }
 
@@ -127,8 +127,7 @@ namespace Cthangover.Mods.NpcBarks
             Done = true; pending = null; HideSpeech(); looks.Clear();
             foreach (var id in Definition.Actors.Values)
             {
-                var actor = World.Session.Find(id);
-                if (actor != null) actor.RouteHeld = false;
+                World.Space.Hold(id, false);
             }
             if (!aborted) BarkMemory.Data.Completed.Add(Definition.Id);
             BarkMemory.Data.Cooldowns[Definition.Id] = aborted ? 2 : Definition.Cooldown;
@@ -137,44 +136,6 @@ namespace Cthangover.Mods.NpcBarks
         }
 
         public void Abort() { if (!Done) Runtime.Abort(); }
-
-        /// <summary>Screen placement is presentation-only; hearing is a separate logical-cell test.</summary>
-        public void Render(RpgWorldHost host, bool paused, List<Rect2> occupied)
-        {
-            if (bubble == null || speech == null || Done) return;
-            var actor = World.Session.Find(SpeakerId);
-            var visible = !paused && actor?.Visible == true && host.View?.Presentation != null
-                && actor.Actor.Position.DistanceSquaredTo(World.Session.Player.Position) <= 64;
-            bubble.Visible = visible;
-            if (!visible) return;
-            var label = bubble.GetNode<Label>("Margin/Text");
-            label.Text = ResolveText(speech);
-            bubble.Size = new Vector2(280, Math.Max(60, label.GetMinimumSize().Y + 24));
-            var position = actor.Actor.Position;
-            var point = host.View.Presentation.ProjectToView(new Vector3(position.X + 0.5f, position.Y + 0.5f, 2.5f));
-            var bounds = new Rect2(Vector2.Zero, host.Size);
-            if (!bounds.HasPoint(point)) { bubble.Visible = false; return; }
-            var location = new Vector2(Math.Clamp(point.X - 140, 8, Math.Max(8, host.Size.X - 290)),
-                Math.Clamp(point.Y - bubble.Size.Y - 16, 8, Math.Max(8, host.Size.Y - bubble.Size.Y - 8)));
-            var rectangle = new Rect2(location, bubble.Size);
-            for (var attempt = 0; attempt <= occupied.Count; attempt++)
-            {
-                var collision = false;
-                foreach (var other in occupied)
-                {
-                    if (!rectangle.Grow(6).Intersects(other)) continue;
-                    rectangle.Position = new Vector2(rectangle.Position.X, other.Position.Y - bubble.Size.Y - 14);
-                    collision = true;
-                    break;
-                }
-                if (!collision) break;
-            }
-            if (rectangle.Position.Y < 8) { bubble.Visible = false; return; }
-            bubble.Position = rectangle.Position;
-            occupied.Add(rectangle);
-            bubble.GetNode<Line2D>("Connector").Points = new[] {
-                new Vector2(bubble.Size.X / 2, bubble.Size.Y + 10), point - rectangle.Position + new Vector2(0, 8) };
-        }
 
         private string ResolveText(ActionText action)
         {
@@ -196,22 +157,17 @@ namespace Cthangover.Mods.NpcBarks
 
         private void HideSpeech()
         {
-            if (bubble != null) { bubble.QueueFree(); bubble = null; }
+            World.Space.Hide(this);
             speech = null; SpeakerId = null;
         }
 
+        /// <summary>Resolved addressee is shared by speech labels, attention and optional positional effects.</summary>
+        public string AddresseeId => SpeakerId != null && looks.TryGetValue(SpeakerRole(), out var target) ? World.Resolve(target) : null;
+        public string UtteranceId => utterance;
+        private string SpeakerRole() { foreach (var pair in World.Roles) if (pair.Value == SpeakerId) return pair.Key; return ""; }
         private void ApplyLooks()
         {
-            foreach (var pair in looks)
-            {
-                var actor = World.Session.Find(World.Roles[pair.Key]);
-                if (actor?.Visible != true || actor.Actor.IsMoving || !World.TryPosition(pair.Value, out var target)) continue;
-                var difference = target - actor.Actor.Position;
-                if (difference.LengthSquared() < 0.01f) continue;
-                actor.Actor.Face(Math.Abs(difference.X) > Math.Abs(difference.Y)
-                    ? difference.X > 0 ? RpgDirection.Right : RpgDirection.Left
-                    : difference.Y > 0 ? RpgDirection.Down : RpgDirection.Up);
-            }
+            foreach (var pair in looks) World.Space.Look(World.Resolve(pair.Key), World.Resolve(pair.Value));
         }
     }
 }

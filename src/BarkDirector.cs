@@ -23,8 +23,7 @@ namespace Cthangover.Mods.NpcBarks
         private readonly Queue<BarkSpeechEvent> events = new();
         private readonly HashSet<string> eventIds = new();
         private readonly Queue<string> recentIds = new();
-        private RpgWorldSession session;
-        private Control layer;
+        private BarkSpatialWorld session;
         private double scan;
         private double glance;
         private bool paused;
@@ -60,10 +59,7 @@ namespace Cthangover.Mods.NpcBarks
         }
         protected override void OnProcess(double delta)
         {
-            var host = RpgWorldHost.Current;
-            if (host?.Session != session) return;
-            var occupied = new List<Rect2>();
-            foreach (var run in runs) run.Render(host, paused && !WorldPaused, occupied);
+            session?.Render(runs, paused && !WorldPaused);
         }
 
         /// <summary>Cancels all runs and drops transient triggers; saved completion history is owned separately.</summary>
@@ -72,29 +68,22 @@ namespace Cthangover.Mods.NpcBarks
             foreach (var run in runs) run.Abort();
             runs.Clear(); events.Clear(); eventIds.Clear(); recentIds.Clear();
             suppressed.Clear(); WorldPaused = false;
-            if (GodotObject.IsInstanceValid(layer)) layer.QueueFree();
-            layer = null; session = null; scan = 0; Clock = 0; SessionId = Guid.NewGuid().ToString("N");
-        }
-
-        /// <summary>Creates only the dynamic row; its layout and visual style are in the mod scene prefab.</summary>
-        public Control CreateBubble()
-        {
-            var bubble = TscnScenes.LoadAndBuild("scenes/ui/npc_speech.tscn") as Control;
-            if (bubble == null) throw new InvalidOperationException("npc speech prefab is missing");
-            layer.AddChild(bubble);
-            return bubble;
+            session?.Release(); session = null; scan = 0; Clock = 0; SessionId = Guid.NewGuid().ToString("N");
         }
 
         private void OnWorld(RpgWorldHost host, double delta, bool blocked)
         {
-            if (session != host.Session)
-            {
-                Clear(); session = host.Session;
-                layer = new Control { Name = "NpcSpeechLayer", MouseFilter = Control.MouseFilterEnum.Ignore };
-                host.AddChild(layer);
-                layer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-            }
-            paused = WorldPaused || RpgInput.IsSimulationBlocked(host) || host.View?.Presentation == null;
+            var adapter = session as RpgBarkWorld;
+            if (adapter?.Session != host.Session) adapter = new RpgBarkWorld(host.Session, host);
+            Advance(adapter, delta, RpgInput.IsSimulationBlocked(host) || host.View?.Presentation == null);
+        }
+
+        /// <summary>One active adapter supplies simulation ticks. Switching identity aborts runs and invalidates old speech triggers.</summary>
+        public void Advance(BarkSpatialWorld world, double delta, bool blocked)
+        {
+            if (world == null || !double.IsFinite(delta) || delta < 0) throw new ArgumentOutOfRangeException(nameof(delta));
+            if (!ReferenceEquals(session, world)) { Clear(); session = world; }
+            paused = WorldPaused || blocked;
             if (paused) return;
             StartPendingPreview();
             Clock += delta;
@@ -106,7 +95,7 @@ namespace Cthangover.Mods.NpcBarks
             while (count-- > 0)
             {
                 var speech = events.Dequeue();
-                if (speech.Map != session.Map.ID || speech.SessionId != SessionId || Clock - speech.At > 2 || speech.Depth > 8) continue;
+                if (speech.Map != session.MapId || speech.SessionId != SessionId || Clock - speech.At > 2 || speech.Depth > 8) continue;
                 if (bySpeech.TryGetValue(speech.Map + "|" + speech.Phase + "|" + speech.Cue, out var responses))
                     foreach (var definition in responses)
                         if (definition.SourceActor == null || definition.SourceActor == speech.Speaker) TryStart(definition, speech);
@@ -120,15 +109,15 @@ namespace Cthangover.Mods.NpcBarks
             scan -= delta;
             if (scan > 0) return;
             scan = 0.1;
-            if (byMap.TryGetValue(session.Map.ID, out var nearby))
+            if (byMap.TryGetValue(session.MapId, out var nearby))
                 ScanNearby(nearby);
             glance += 0.1;
-            PassiveAttention();
+            session.PassiveAttention(glance);
         }
 
         private bool TryStart(BarkDefinition definition, BarkSpeechEvent speech)
         {
-            if (suppressed.Contains(definition.Id) || definition.Map != session.Map.ID || runs.Count >= 32) return false;
+            if (suppressed.Contains(definition.Id) || definition.Map != session.MapId || runs.Count >= 32) return false;
             if (definition.Once && BarkMemory.Data.Completed.Contains(definition.Id)) return false;
             if (BarkMemory.Data.Cooldowns.TryGetValue(definition.Id, out var cooldown) && cooldown > 0) return false;
             foreach (var run in runs)
@@ -139,13 +128,13 @@ namespace Cthangover.Mods.NpcBarks
                     if (run.Definition.Actors.ContainsValue(actor)) return false;
             }
             foreach (var actor in definition.Actors.Values)
-                if (session.Find(actor)?.Visible != true || session.Find(actor).Actor.IsMoving) return false;
+                if (!session.TryPosition(actor, out _) || session.Moving(actor) || !session.CanReserve(actor)) return false;
             var context = new BarkWorldContext(session, definition, speech);
             try
             {
                 if (!ScenarioCondition.EvaluateWithServices(definition.Condition, context.Scope, context)) return false;
                 var candidate = new BarkRun(this, definition, context, speech);
-                foreach (var actor in definition.Actors.Values) session.Find(actor).RouteHeld = true;
+                foreach (var actor in definition.Actors.Values) session.Hold(actor, true);
                 runs.Add(candidate);
                 try { candidate.Start(); }
                 catch { candidate.Abort(); throw; }
@@ -160,22 +149,6 @@ namespace Cthangover.Mods.NpcBarks
             }
         }
 
-        private void PassiveAttention()
-        {
-            var look = glance % 3 < 0.6;
-            foreach (var actor in session.Instances)
-            {
-                if (actor.RouteHeld || !actor.Visible || actor.Actor.IsMoving || actor.Current.Form != Cthangover.Mods.Rpg.Model.RpgObjectForm.Actor
-                    || actor.Current.Category != "npc" || actor.Current.Route != null) continue;
-                var difference = session.Player.Position - actor.Actor.Position;
-                if (difference.LengthSquared() > 25 || difference.LengthSquared() < 0.01f) continue;
-                if (!look) { actor.Actor.Face(actor.Current.Facing); continue; }
-                actor.Actor.Face(Math.Abs(difference.X) > Math.Abs(difference.Y)
-                    ? difference.X > 0 ? RpgDirection.Right : RpgDirection.Left
-                    : difference.Y > 0 ? RpgDirection.Down : RpgDirection.Up);
-            }
-        }
-
         private void OnInteraction(RpgWorldHost host, RpgInstance actor)
         {
             foreach (var run in runs)
@@ -183,7 +156,7 @@ namespace Cthangover.Mods.NpcBarks
         }
         private void OnSpeech(BarkSpeechEvent speech)
         {
-            if (session == null || speech.Map != session.Map.ID || speech.SessionId != SessionId || events.Count >= 128 || !eventIds.Add(speech.EventId)) return;
+            if (session == null || speech.Map != session.MapId || speech.SessionId != SessionId || events.Count >= 128 || !eventIds.Add(speech.EventId)) return;
             recentIds.Enqueue(speech.EventId);
             if (recentIds.Count > 4096) eventIds.Remove(recentIds.Dequeue());
             Trace(speech.RunId, speech.Phase + " cue=" + speech.Cue + " speaker=" + speech.Speaker);

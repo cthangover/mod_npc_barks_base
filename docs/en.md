@@ -118,3 +118,22 @@ Menus and ordinary blocking tools pause the simulation and reading timers. The b
 The `npc_barks_base` save slot stores a `History` blob: completed definition IDs and remaining cooldowns. Bubbles, execution pointers and queued speech events are not saved or replayed; active runs receive a small cooldown on save. An aborted run is not marked completed. Flags remain ordinary saved game flags.
 
 Implementation: `mods/npc_barks_base/src/` and `mods/dialog_base/src/IScenarioExecutionHost.cs`. The authoring seam is `BackgroundScenarios.Provider` / `IBackgroundScenarioTools`. Tests: `npc_barks` and `npc_barks_tools` in the test manifest.
+
+## 3D spatial consumer
+
+`BarkSpatialWorld` now supplies live positions, units, hearing, movement, reservations
+and attention to the same director/runtime. `RpgBarkWorld` retains the existing cell
+geometry, 8-cell hearing, cardinal looks, route holds and bubble prefab; the existing
+`BarkWorldContext(RpgWorldSession, ...)` constructor, Session accessor and Vector2 TryPosition method remain.
+New spatial consumers use TrySpatialPosition for all three axes.
+The director exposes `Advance(world, seconds, blocked)` for an active spatial owner.
+An adapter switch invalidates transient runs and speech events. Optional `CanReserve`
+and `Owns` guards default to the historical policy and let a 3D actor yield to another
+activity owner. Existing RPG observation registration remains unchanged.
+
+`barks3d_base` is the separate 3D consumer: logical scene/actor roles, metre distances,
+wall hearing, head bubbles, offscreen direction, recipients, reading queue and history.
+Speech presentation uses every text action, including speech without a reaction cue;
+`BarkSpeechEvent` itself and cue/reaction semantics remain unchanged.
+Existing public RPG API and package dependencies remain for compatibility. No 2D
+regression suite was run as part of 3D acceptance.
