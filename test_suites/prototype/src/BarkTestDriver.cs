@@ -127,7 +127,7 @@ namespace Cthangover.Mods.NpcBarks.Prototype
                     Capture("jrp_company"); Finish(); return;
             }
         }
-        private static SceneManager Manager() => ((SceneTree)Engine.GetMainLoop()).Root.GetNode<SceneManager>("SceneManager");
+        private static SceneManager Manager() => ((SceneTree)Godot.Engine.GetMainLoop()).Root.GetNode<SceneManager>("SceneManager");
         private static bool Flag(string key) => GameData.Instance.Runtime.Flags.TryGetValue(key, out var value) && value == "1";
         private static void Press(Key key, bool pressed) => Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = pressed });
         private void Next() { step++; wait = 0; }
